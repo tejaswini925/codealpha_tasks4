@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>StudyStack - Flashcard Quiz App</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow-x: hidden; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+    }
+    .bg-canvas {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%; z-index: -2;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      background-size: 400% 400%;
+      animation: bgShift 8s ease infinite;
+    }
+    @keyframes bgShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .orb { position:fixed; border-radius:50%; filter:blur(90px); opacity:0.3; animation:floatOrb 8s ease-in-out infinite; z-index:-1; }
+    .orb1 { width:500px; height:500px; background:#7b2ff7; top:-150px; left:-150px; animation-delay:0s; }
+    .orb2 { width:400px; height:400px; background:#00d4ff; bottom:-100px; right:-100px; animation-delay:3s; }
+    .orb3 { width:300px; height:300px; background:#ff6fd8; top:30%; left:55%; animation-delay:5s; }
+    @keyframes floatOrb {
+      0%,100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-40px) scale(1.08); }
+    }
+    .stars { position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; pointer-events:none; }
+    .star  { position:absolute; background:#fff; border-radius:50%; opacity:0; animation:twinkle var(--dur) ease-in-out infinite; }
+    @keyframes twinkle { 0%,100%{opacity:0;} 50%{opacity:0.9;} }
+
+    header {
+      width:100%; max-width:860px;
+      display:flex; justify-content:space-between; align-items:center;
+      padding-bottom:18px; z-index:1;
+    }
+    .logo { display:flex; align-items:center; gap:10px; }
+    .logo-icon { font-size:28px; }
+    .logo-text { font-size:26px; font-weight:800; color:#fff; letter-spacing:-0.5px; }
+    .logo-sub  { font-size:12px; color:#a78bfa; font-weight:500; margin-top:2px; }
+
+    .btn-add {
+      background:linear-gradient(135deg,#7b2ff7,#00d4ff);
+      color:#fff; border:none; border-radius:12px;
+      padding:12px 24px; font-size:15px; font-weight:700; cursor:pointer;
+      box-shadow:0 4px 20px rgba(123,47,247,0.5); transition:transform 0.15s;
+    }
+    .btn-add:hover { transform:translateY(-2px); }
+
+    .progress-area {
+      width:100%; max-width:860px;
+      display:flex; align-items:center; gap:16px;
+      margin-bottom:24px; z-index:1;
+    }
+    .counter { font-size:14px; font-weight:700; color:#a78bfa; min-width:55px; }
+    .progress-bar { flex:1; height:7px; background:rgba(255,255,255,0.12); border-radius:99px; overflow:hidden; }
+    .progress-fill { height:100%; background:linear-gradient(90deg,#7b2ff7,#00d4ff); border-radius:99px; transition:width 0.4s ease; }
+
+    .card-scene {
+      width:100%; max-width:860px; height:360px;
+      perspective:1200px; cursor:pointer; outline:none; z-index:1;
+    }
+    .card-inner {
+      width:100%; height:100%; position:relative;
+      transform-style:preserve-3d;
+      transition:transform 0.6s cubic-bezier(0.4,0.2,0.2,1);
+    }
+    .card-scene.flipped .card-inner { transform:rotateY(180deg); }
+    .card-face {
+      position:absolute; inset:0; backface-visibility:hidden;
+      border-radius:24px; padding:44px 56px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+    }
+    .card-front {
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.18);
+      backdrop-filter:blur(24px);
+      box-shadow:0 12px 48px rgba(0,0,0,0.5);
+    }
+    .card-back {
+      background:linear-gradient(135deg,rgba(123,47,247,0.75),rgba(0,212,255,0.55));
+      border:1px solid rgba(255,255,255,0.2);
+      backdrop-filter:blur(24px);
+      box-shadow:0 12px 48px rgba(123,47,247,0.5);
+      transform:rotateY(180deg);
+    }
+    .face-label {
+      font-size:12px; font-weight:800; letter-spacing:0.15em;
+      text-transform:uppercase; color:#a78bfa; margin-bottom:22px;
+    }
+    .card-back .face-label { color:#c4f0ff; }
+    .card-text {
+      font-size:22px; font-weight:500; color:#f0eeff;
+      line-height:1.65; text-align:center; flex:1;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .tap-hint { font-size:13px; color:rgba(255,255,255,0.3); font-style:italic; margin-top:22px; }
+
+    .controls {
+      display:flex; align-items:center; gap:16px; margin-top:24px;
+      width:100%; max-width:860px; justify-content:space-between; z-index:1;
+    }
+    .btn-nav {
+      background:rgba(255,255,255,0.09); border:1px solid rgba(255,255,255,0.18);
+      color:#a78bfa; border-radius:12px; padding:13px 32px;
+      font-size:16px; font-weight:700; cursor:pointer; transition:all 0.15s;
+    }
+    .btn-nav:hover { background:rgba(123,47,247,0.3); color:#fff; transform:translateY(-1px); }
+    .btn-nav:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
+    .card-actions { display:flex; gap:12px; }
+    .btn-action {
+      background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14);
+      font-size:15px; cursor:pointer; color:#a78bfa; font-weight:600;
+      padding:11px 18px; border-radius:10px; transition:all 0.15s;
+    }
+    .btn-action:hover { background:rgba(123,47,247,0.3); color:#fff; }
+    .btn-delete { color:#ff6b6b !important; }
+    .btn-delete:hover { background:rgba(255,107,107,0.2) !important; color:#ff6b6b !important; }
+
+    .empty { display:flex; flex-direction:column; align-items:center; gap:14px; z-index:1; }
+    .empty-icon { font-size:60px; }
+    .empty-text { font-size:22px; font-weight:700; color:#f0eeff; }
+    .empty-hint { font-size:15px; color:#a78bfa; }
+
+    .overlay {
+      position:fixed; inset:0; background:rgba(5,3,20,0.78);
+      backdrop-filter:blur(8px); display:flex; align-items:center;
+      justify-content:center; z-index:100; padding:20px;
+    }
+    .modal {
+      background:rgba(22,15,50,0.98); border:1px solid rgba(255,255,255,0.13);
+      border-radius:22px; padding:34px 34px 28px; width:100%; max-width:500px;
+      box-shadow:0 32px 80px rgba(0,0,0,0.7);
+      display:flex; flex-direction:column; gap:14px;
+    }
+    .modal-title { font-size:21px; font-weight:800; color:#fff; }
+    .modal-hint  { font-size:14px; color:#a78bfa; }
+    .field-label { font-size:11px; font-weight:800; color:#a78bfa; letter-spacing:0.1em; text-transform:uppercase; }
+    textarea {
+      width:100%; border:1px solid rgba(255,255,255,0.15); border-radius:12px;
+      padding:13px 15px; font-size:15px; color:#f0eeff; font-family:inherit;
+      resize:vertical; outline:none; background:rgba(255,255,255,0.07); box-sizing:border-box;
+    }
+    textarea:focus { border-color:#7b2ff7; }
+    textarea::placeholder { color:rgba(255,255,255,0.25); }
+    .error-msg { font-size:13px; color:#ff6b6b; font-weight:600; }
+    .modal-row { display:flex; gap:10px; justify-content:flex-end; margin-top:6px; }
+    .btn-cancel {
+      background:rgba(255,255,255,0.09); border:1px solid rgba(255,255,255,0.14);
+      color:#a78bfa; border-radius:12px; padding:11px 22px; font-size:14px; font-weight:600; cursor:pointer;
+    }
+    .btn-save {
+      background:linear-gradient(135deg,#7b2ff7,#00d4ff); border:none; color:#fff;
+      border-radius:12px; padding:11px 26px; font-size:14px; font-weight:700; cursor:pointer;
+    }
+    .btn-save-delete { background:linear-gradient(135deg,#ff416c,#ff4b2b) !important; }
+    .hidden { display:none !important; }
+    @keyframes shake {
+      0%,100%{transform:translateX(0);}
+      20%{transform:translateX(-8px);}
+      40%{transform:translateX(8px);}
+      60%{transform:translateX(-6px);}
+      80%{transform:translateX(6px);}
+    }
+    .shake { animation:shake 0.4s ease; }
+  </style>
+</head>
+<body>
+
+  <div class="bg-canvas"></div>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+  <div class="stars" id="stars"></div>
+
+  <header>
+    <div class="logo">
+      <span class="logo-icon">&#9672;</span>
+      <div>
+        <div class="logo-text">StudyStack</div>
+        <div class="logo-sub">India GK Flashcards</div>
+      </div>
+    </div>
+    <button class="btn-add" onclick="openAdd()">+ New Card</button>
+  </header>
+
+  <div class="progress-area">
+    <span class="counter" id="counter">1 / 10</span>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width:10%"></div>
+    </div>
+  </div>
+
+  <div class="card-scene" id="cardScene" onclick="flipCard()" tabindex="0">
+    <div class="card-inner">
+      <div class="card-face card-front">
+        <span class="face-label">Question</span>
+        <p class="card-text" id="questionText">Loading...</p>
+        <span class="tap-hint">Click to reveal answer</span>
+      </div>
+      <div class="card-face card-back">
+        <span class="face-label">Answer</span>
+        <p class="card-text" id="answerText"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty hidden" id="emptyState">
+    <span class="empty-icon">&#128203;</span>
+    <p class="empty-text">No flashcards yet.</p>
+    <p class="empty-hint">Add your first card to start studying.</p>
+    <button class="btn-add" onclick="openAdd()" style="margin-top:10px">+ New Card</button>
+  </div>
+
+  <div class="controls" id="controls">
+    <button class="btn-nav" id="prevBtn" onclick="go(-1)">&#8249; Prev</button>
+    <div class="card-actions">
+      <button class="btn-action" onclick="openEdit()">&#9998; Edit</button>
+      <button class="btn-action btn-delete" onclick="openDelete()">&#128465; Delete</button>
+    </div>
+    <button class="btn-nav" id="nextBtn" onclick="go(1)">Next &#8250;</button>
+  </div>
+
+  <div class="overlay hidden" id="overlay" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()" id="modalBox">
+      <div id="formModal">
+        <h2 class="modal-title" id="modalTitle">Add New Card</h2>
+        <label class="field-label">Question</label>
+        <textarea id="inputQuestion" rows="3" placeholder="Enter your question..."></textarea>
+        <label class="field-label">Answer</label>
+        <textarea id="inputAnswer" rows="3" placeholder="Enter the answer..."></textarea>
+        <p class="error-msg hidden" id="errorMsg">Both fields are required.</p>
+        <div class="modal-row">
+          <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+          <button class="btn-save" id="saveBtn" onclick="handleSave()">Add Card</button>
+        </div>
+      </div>
+      <div id="deleteModal" class="hidden">
+        <h2 class="modal-title">Delete this card?</h2>
+        <p class="modal-hint">This action cannot be undone.</p>
+        <div class="modal-row">
+          <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+          <button class="btn-save btn-save-delete" onclick="handleDelete()">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var starsEl = document.getElementById("stars");
+    for (var i = 0; i < 90; i++) {
+      var st = document.createElement("div");
+      st.className = "star";
+      st.style.left = (Math.random() * 100) + "%";
+      st.style.top  = (Math.random() * 100) + "%";
+      st.style.setProperty("--dur", (2 + Math.random() * 4) + "s");
+      st.style.animationDelay = (Math.random() * 6) + "s";
+      st.style.width = st.style.height = (Math.random() > 0.7 ? 3 : 2) + "px";
+      starsEl.appendChild(st);
+    }
+
+    var cards = [
+      { id:1,  question:"Which Indian city is known as the Silicon Valley of India and why?",
+                answer:"Bengaluru (Bangalore) - it hosts the headquarters of India's largest IT companies like Infosys and Wipro, and major global tech firms like Google and Microsoft." },
+      { id:2,  question:"Who was the first woman to become the President of India?",
+                answer:"Pratibha Patil - she served as the 12th President of India from 2007 to 2012." },
+      { id:3,  question:"Which Indian freedom fighter was nicknamed Netaji?",
+                answer:"Subhas Chandra Bose - he founded the Indian National Army (INA) and famously declared: Give me blood, and I shall give you freedom." },
+      { id:4,  question:"What is the significance of Article 370 in the Indian Constitution?",
+                answer:"It granted special autonomous status to Jammu and Kashmir. It was revoked in August 2019, making J and K a Union Territory." },
+      { id:5,  question:"Which Indian state has the highest literacy rate?",
+                answer:"Kerala - with a literacy rate of about 96 percent, it has consistently led India in education and social development indicators." },
+      { id:6,  question:"What was the original name of Mumbai before it was renamed?",
+                answer:"Bombay - the city was renamed Mumbai in 1995 after the goddess Mumbadevi, following a campaign by the Shiv Sena party." },
+      { id:7,  question:"Which Indian scientist is known as the Missile Man of India?",
+                answer:"Dr. A.P.J. Abdul Kalam - he led India's Agni and Prithvi missile programs and later served as the 11th President of India from 2002 to 2007." },
+      { id:8,  question:"What is the Panchayati Raj system in India?",
+                answer:"A three-tier system of rural local self-governance at village (Gram Panchayat), block (Panchayat Samiti), and district (Zila Parishad) levels, established under the 73rd Constitutional Amendment in 1992." },
+      { id:9,  question:"Which ruler built the Qutub Minar and what was its original purpose?",
+                answer:"Qutb ud-Din Aibak began it in 1193 AD and it was completed by Iltutmish. It served as a minaret for the call to prayer and a symbol of the Delhi Sultanate power." },
+      { id:10, question:"What is the Green Revolution in India and who is credited with leading it?",
+                answer:"A 1960s-70s agricultural transformation that introduced high-yield crop varieties and modern farming techniques. M.S. Swaminathan is credited as its father in India." }
+    ];
+
+    var currentIndex = 0, isFlipped = false, modalMode = null, nextId = 11;
+
+    function render() {
+      var total = cards.length;
+      var cardScene  = document.getElementById("cardScene");
+      var emptyState = document.getElementById("emptyState");
+      var controls   = document.getElementById("controls");
+      if (total === 0) {
+        cardScene.classList.add("hidden"); emptyState.classList.remove("hidden"); controls.classList.add("hidden");
+        document.getElementById("counter").textContent = "No cards";
+        document.getElementById("progressFill").style.width = "0%";
+        return;
+      }
+      cardScene.classList.remove("hidden"); emptyState.classList.add("hidden"); controls.classList.remove("hidden");
+      var card = cards[currentIndex];
+      document.getElementById("questionText").textContent = card.question;
+      document.getElementById("answerText").textContent   = card.answer;
+      document.getElementById("counter").textContent = (currentIndex + 1) + " / " + total;
+      document.getElementById("progressFill").style.width = (((currentIndex + 1) / total) * 100) + "%";
+      document.getElementById("prevBtn").disabled = (total < 2);
+      document.getElementById("nextBtn").disabled = (total < 2);
+      cardScene.classList.remove("flipped");
+      isFlipped = false;
+    }
+
+    function flipCard() { isFlipped = !isFlipped; document.getElementById("cardScene").classList.toggle("flipped", isFlipped); }
+
+    function go(dir) {
+      isFlipped = false; document.getElementById("cardScene").classList.remove("flipped");
+      setTimeout(function() { currentIndex = (currentIndex + dir + cards.length) % cards.length; render(); }, 150);
+    }
+
+    function openAdd() {
+      modalMode = "add";
+      document.getElementById("modalTitle").textContent = "Add New Card";
+      document.getElementById("saveBtn").textContent    = "Add Card";
+      document.getElementById("inputQuestion").value   = "";
+      document.getElementById("inputAnswer").value     = "";
+      document.getElementById("errorMsg").classList.add("hidden");
+      document.getElementById("formModal").classList.remove("hidden");
+      document.getElementById("deleteModal").classList.add("hidden");
+      document.getElementById("overlay").classList.remove("hidden");
+    }
+
+    function openEdit() {
+      var card = cards[currentIndex]; modalMode = "edit";
+      document.getElementById("modalTitle").textContent = "Edit Card";
+      document.getElementById("saveBtn").textContent    = "Save Changes";
+      document.getElementById("inputQuestion").value   = card.question;
+      document.getElementById("inputAnswer").value     = card.answer;
+      document.getElementById("errorMsg").classList.add("hidden");
+      document.getElementById("formModal").classList.remove("hidden");
+      document.getElementById("deleteModal").classList.add("hidden");
+      document.getElementById("overlay").classList.remove("hidden");
+    }
+
+    function openDelete() {
+      modalMode = "delete";
+      document.getElementById("formModal").classList.add("hidden");
+      document.getElementById("deleteModal").classList.remove("hidden");
+      document.getElementById("overlay").classList.remove("hidden");
+    }
+
+    function closeModal() { document.getElementById("overlay").classList.add("hidden"); modalMode = null; }
+
+    function handleSave() {
+      var q = document.getElementById("inputQuestion").value.trim();
+      var a = document.getElementById("inputAnswer").value.trim();
+      if (!q || !a) {
+        document.getElementById("errorMsg").classList.remove("hidden");
+        var mb = document.getElementById("modalBox");
+        mb.classList.add("shake"); setTimeout(function(){ mb.classList.remove("shake"); }, 500); return;
+      }
+      if (modalMode === "add") { cards.push({ id:nextId++, question:q, answer:a }); currentIndex = cards.length - 1; }
+      else { cards[currentIndex].question = q; cards[currentIndex].answer = a; }
+      closeModal(); render();
+    }
+
+    function handleDelete() {
+      cards.splice(currentIndex, 1);
+      if (currentIndex >= cards.length) currentIndex = Math.max(0, cards.length - 1);
+      closeModal(); render();
+    }
+
+    document.getElementById("cardScene").addEventListener("keydown", function(e) {
+      if (e.key === "Enter")      flipCard();
+      if (e.key === "ArrowRight") go(1);
+      if (e.key === "ArrowLeft")  go(-1);
+    });
+
+    render();
+  </script>
+</body>
+</html>
